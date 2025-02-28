@@ -173,6 +173,39 @@ def _patch_ref_binary(config: Dict[str, Dict]):
         ValueError: A given configuration settings is invalid.
     """
     import shutil
+    import subprocess
+
+    # Check if a reference FW image is compressed (to save space in the repo).
+    if config["Paths"]["ReferenceFw"].suffix == ".lzma":
+        decompressed_file = (
+            config["Paths"]["BuildDir"] / config["Paths"]["ReferenceFw"].name
+        ).with_suffix(".decompressed")
+
+        logging.info(
+            f"Decompressing reference image {config['Paths']['ReferenceFw']}..."
+        )
+
+        decompression_start = timeit.default_timer()
+        result = subprocess.run(
+            [
+                _SCRIPT_DIR / "Executables" / "LzmaCompress",
+                "-d",
+                config["Paths"]["ReferenceFw"],
+                "-o",
+                decompressed_file,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        decompression_end = timeit.default_timer()
+        logging.debug(f"  Output = {result.stdout}")
+        if result.returncode != 0:
+            if decompressed_file.exists():
+                decompressed_file.unlink()
+            raise ValueError(f"Failed to decompress {config['Paths']['ReferenceFw']}\n")
+        logging.info(f"  - In {decompression_end - decompression_start:.2f} seconds!\n")
+        config["Paths"]["ReferenceFw"] = decompressed_file
 
     logging.info(f"Patching reference image {config['Paths']['ReferenceFw']}...")
     shutil.copyfile(config["Paths"]["ReferenceFw"], config["Paths"]["Output"])
@@ -290,6 +323,8 @@ def _parse_config(args: argparse.Namespace, conf_path: PurePath = None) -> Dict:
     if "Input" not in config["Paths"]:
         raise ValueError("An input file path is required.")
 
+    config["Paths"]["BuildDir"] = _SCRIPT_DIR / "Build" / config["Name"]
+
     for path in config["Paths"]:
         if not config["Paths"][path]:
             raise ValueError(f'A "{path}" file path is required.')
@@ -299,7 +334,11 @@ def _parse_config(args: argparse.Namespace, conf_path: PurePath = None) -> Dict:
                 logging.warning("**The input file does not have a .efi extension.**\n")
             if not config["Paths"][path].is_absolute():
                 config["Paths"][path] = _SCRIPT_DIR / config["Paths"][path]
-        if not config["Paths"][path].exists() and path != "Output":
+        if (
+            not config["Paths"][path].exists()
+            and path != "Output"
+            and path != "BuildDir"
+        ):
             raise FileNotFoundError(
                 f'The given "{path}" file '
                 f"({str(config['Paths'][path])}) does "
@@ -323,7 +362,7 @@ def _generate_new_ffs(config: Dict) -> None:
 
     logging.info("Generating new Rust DXE Core FFS:\n")
 
-    target_dir = _SCRIPT_DIR / "Build" / config["Name"]
+    target_dir = config["Paths"]["BuildDir"]
     target_dir.mkdir(parents=True, exist_ok=True)
 
     build_fv_layout = target_dir / config["Paths"]["FvLayout"].name

@@ -26,6 +26,10 @@ Generally, you just need to give the config file for the platform and the locati
 python patch.py --config Configs/QemuQ35.json -i "C:\src\patina-dxe-core-qemu\target\x86_64-unknown-uefi\debug\qemu_q35_dxe_core.efi"
 ```
 
+```sh
+python patch.py --config Configs/QemuSbsa.json -i "C:\src\patina-dxe-core-qemu\target\aarch64-unknown-uefi\debug\qemu_sbsa_dxe_core.efi"
+```
+
 The command-line arguments override equivalent values in the config file. It is recommended to also specify the config
 file for the platform target and then override what you'd like.
 
