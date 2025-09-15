@@ -186,18 +186,23 @@ def _patch_ref_binary(config: Dict[str, Dict]):
         )
 
         decompression_start = timeit.default_timer()
-        result = subprocess.run(
-            [
-                _SCRIPT_DIR / "Executables" / "LzmaCompress",
-                "-d",
-                config["Paths"]["ReferenceFw"],
-                "-o",
-                decompressed_file,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    _SCRIPT_DIR / "Executables" / "LzmaCompress",
+                    "-d",
+                    config["Paths"]["ReferenceFw"],
+                    "-o",
+                    decompressed_file,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f'\n\nFailed to run command: LzmaCompress\n\n{e.stdout}\n'
+            ) from e
         decompression_end = timeit.default_timer()
         logging.debug(f"  Output = {result.stdout}")
         if result.returncode != 0:
@@ -479,12 +484,18 @@ def _generate_new_ffs(config: Dict) -> None:
         logging.debug(f"  {' ' * len(step_text)} Command = {command}\n")
         exe_name = f"{command[0]}.exe" if os.name == "nt" else command[0]
 
-        result = subprocess.run(
-            [_SCRIPT_DIR / "Executables" / exe_name] + command[1],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [_SCRIPT_DIR / "Executables" / exe_name] + command[1],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f'\n\nFailed to run command: {"".join(str(command))}\n\n{e.stdout}\n'
+            ) from e
+
         log_msg = f"  {' ' * len(step_text)} Output = " f"{str(result.stdout).rstrip()}"
 
         if result.stdout:
